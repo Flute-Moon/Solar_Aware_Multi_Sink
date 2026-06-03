@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
-# for Google Colab 
+# only for Google Colab 
 def _in_colab() -> bool:
     """Detect whether we are running inside Google Colab."""
     try:
@@ -73,7 +73,7 @@ def _in_colab() -> bool:
     except ImportError:
         return False
 
-
+# and this is for all code editor like vs code , codex etc except Google Colab
 def _in_notebook() -> bool:
     """Detect a Jupyter/IPython kernel (Colab counts too)."""
     try:
