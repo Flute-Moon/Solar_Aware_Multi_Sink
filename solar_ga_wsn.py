@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
-// for Google Colab 
+# for Google Colab 
 def _in_colab() -> bool:
     """Detect whether we are running inside Google Colab."""
     try:
