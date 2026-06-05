@@ -238,8 +238,9 @@ class Node:
         self.goes_direct = False
 
     @property
-    def energy_fraction(self) -> float:
-        return self.energy / self._cfg["E_INITIAL"]
+@property
+def energy_fraction(self) -> float:
+    return min(self.energy / BATTERY_MAX, 1.0)
 
     def __repr__(self) -> str:
         return (f"Node({self.id}, {self.role}, "
