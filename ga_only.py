@@ -245,11 +245,20 @@ class Node:
         return (f"Node({self.id}, {self.role}, "
                 f"{self.energy:.4f}J, alive={self.alive})")
 
-
 def solar_rate_for_round(round_num: int, max_harvest: float) -> float:
+    """
+    24-hour cycle:
+        00:00 -> 0
+        06:00 -> sunrise
+        12:00 -> peak solar
+        18:00 -> sunset
+        18:00-24:00 -> 0
+    """
     hour = round_num % 24
-    return max_harvest * max(0.0, math.sin(math.pi * hour / 12))
-
+    return max_harvest * max(
+        0.0,
+        math.sin(math.pi * (hour - 6) / 12)
+    )
 
 # ==============================================================================
 # SECTION 4 - WORLD STATE
@@ -343,11 +352,21 @@ def _evaluate_population(pop: List["Chromosome"],
     ch_e   = alive_e[gene_idx]
 
     e_score = np.minimum(ch_e.sum(axis=1) / (K * cfg["E_INITIAL"]), 1.0)
+                           
+if cfg["MAX_HARVEST"] > 0:
+    solar_fraction = solar_now / cfg["MAX_HARVEST"]
 
-    if cfg["MAX_HARVEST"] > 0 and solar_now > 0:
-        s_score = np.minimum(ch_e.mean(axis=1) / cfg["E_INITIAL"], 1.0)
-    else:
-        s_score = np.full(P, 0.5)
+    energy_fraction = np.minimum(
+        ch_e.mean(axis=1) / cfg["E_INITIAL"],
+        1.0
+    )
+
+    s_score = (
+        0.5 * solar_fraction +
+        0.5 * energy_fraction
+    )
+else:
+    s_score = np.full(P, 0.5)
 
     comm_range2 = (cfg["FIELD"] * COMM_RANGE_PCT) ** 2
     big_alloc   = P * S * K
@@ -866,11 +885,13 @@ def plot_results(ga_stats, ga_fd, cfg) -> None:
     rg = range(len(ga_stats["alive_nodes"]))
 
     # 1. Alive
-    ax = axes[0, 0]
-    ax.plot(rg, ga_stats["alive_nodes"], color=C_GA, lw=2, label="GA")
-    if ga_fd:
-        ax.axvline(ga_fd, color=C_GA, ls=":", alpha=0.6,
-                   label=f"GA 1st death r{ga_fd}")
+# 1. Alive
+ax = axes[0, 0]
+ax.plot(rg, ga_stats["alive_nodes"], color=C_GA, lw=2, label="GA")
+
+if ga_fd is not None:
+    ax.axvline(ga_fd, color=C_GA, ls=":", alpha=0.6,
+               label=f"GA 1st death r{ga_fd}")
     ax.set(xlabel="Round", ylabel="Alive nodes",
            title="Network Lifetime",
            ylim=(0, cfg["NUM_NODES"] + 2))
@@ -1238,9 +1259,9 @@ def print_summary(ga_s, ga_fd, ga_nd, cfg) -> None:
     print("=" * 64)
     print(f"  {'Metric':<40} {'GA':>10}")
     print(f"  {'-' * 50}")
-
-    def fmt(v):
-        return str(v) if v else f">{cfg['NUM_ROUNDS']}"
+   
+def fmt(v):
+    return str(v) if v is not None else f">{cfg['NUM_ROUNDS']}"
 
     rows = [
         ("First node death (round)",      fmt(ga_fd)),
