@@ -89,9 +89,9 @@ def get_user_input() -> dict:
 
     print("\n  -- Routing Thresholds --")
     d_dist   = ask("Max distance (m) for CH->BS direct",
-                   round(field * 0.55), float, 10)
+                   round(field * 0.75), float, 10)
     d_nrg    = ask("Min battery fraction for CH->BS direct (0.0-1.0)",
-                   0.4, float, 0.0, 1.0)
+                   round(e_init / BATTERY_MAX * 0.6, 2), float, 0.0, 1.0)
 
     print("\n  -- Topology Snapshots --")
     snap_every = ask("Save topology image every N rounds (0 = off)",
@@ -236,10 +236,10 @@ class Node:
         self.assigned_ch = None
         self.assigned_ms = None
         self.goes_direct = False
-       
-       @property
-def energy_fraction(self) -> float:
-    return min(self.energy / BATTERY_MAX, 1.0)
+
+    @property
+    def energy_fraction(self) -> float:
+        return min(self.energy / BATTERY_MAX, 1.0)
 
     def __repr__(self) -> str:
         return (f"Node({self.id}, {self.role}, "
@@ -352,21 +352,21 @@ def _evaluate_population(pop: List["Chromosome"],
     ch_e   = alive_e[gene_idx]
 
     e_score = np.minimum(ch_e.sum(axis=1) / (K * cfg["E_INITIAL"]), 1.0)
-                           
-if cfg["MAX_HARVEST"] > 0:
-    solar_fraction = solar_now / cfg["MAX_HARVEST"]
 
-    energy_fraction = np.minimum(
-        ch_e.mean(axis=1) / cfg["E_INITIAL"],
-        1.0
-    )
+    if cfg["MAX_HARVEST"] > 0:
+        solar_fraction = solar_now / cfg["MAX_HARVEST"]
 
-    s_score = (
-        0.5 * solar_fraction +
-        0.5 * energy_fraction
-    )
-else:
-    s_score = np.full(P, 0.5)
+        energy_fraction = np.minimum(
+            ch_e.mean(axis=1) / cfg["E_INITIAL"],
+            1.0
+        )
+
+        s_score = (
+            0.5 * solar_fraction +
+            0.5 * energy_fraction
+        )
+    else:
+        s_score = np.full(P, 0.5)
 
     comm_range2 = (cfg["FIELD"] * COMM_RANGE_PCT) ** 2
     big_alloc   = P * S * K
@@ -404,8 +404,17 @@ else:
     else:
         sp_score = np.full(P, 0.5)
 
-    fitness = (0.25 * e_score + 0.25 * s_score
-               + 0.30 * c_score + 0.20 * sp_score)
+    # BS-proximity score: reward chromosome sets where at least some CHs
+    # are close to the BS (enabling PATH A direct routing).
+    bs_xy    = np.array([[cfg["BS_X"], cfg["BS_Y"]]], dtype=np.float64)
+    max_dist = math.hypot(cfg["FIELD"], cfg["BS_Y"])
+    ch_bs_d  = np.sqrt(((ch_xy - bs_xy[:, None, :]) ** 2).sum(axis=2))   # (P, K)
+    # Score = fraction of CHs that are within DIRECT_DIST of BS
+    bs_score = (ch_bs_d <= cfg["DIRECT_DIST"]).sum(axis=1) / max(K, 1)
+    bs_score = bs_score.astype(np.float64)
+
+    fitness = (0.20 * e_score + 0.20 * s_score
+               + 0.30 * c_score + 0.15 * sp_score + 0.15 * bs_score)
     fitness = np.where(valid, fitness, 0.0)
 
     for p, c in enumerate(pending):
@@ -887,13 +896,12 @@ def plot_results(ga_stats, ga_fd, cfg) -> None:
     rg = range(len(ga_stats["alive_nodes"]))
 
     # 1. Alive
-# 1. Alive
-ax = axes[0, 0]
-ax.plot(rg, ga_stats["alive_nodes"], color=C_GA, lw=2, label="GA")
+    ax = axes[0, 0]
+    ax.plot(rg, ga_stats["alive_nodes"], color=C_GA, lw=2, label="GA")
 
-if ga_fd is not None:
-    ax.axvline(ga_fd, color=C_GA, ls=":", alpha=0.6,
-               label=f"GA 1st death r{ga_fd}")
+    if ga_fd is not None:
+        ax.axvline(ga_fd, color=C_GA, ls=":", alpha=0.6,
+                   label=f"GA 1st death r{ga_fd}")
     ax.set(xlabel="Round", ylabel="Alive nodes",
            title="Network Lifetime",
            ylim=(0, cfg["NUM_NODES"] + 2))
@@ -1261,9 +1269,9 @@ def print_summary(ga_s, ga_fd, ga_nd, cfg) -> None:
     print("=" * 64)
     print(f"  {'Metric':<40} {'GA':>10}")
     print(f"  {'-' * 50}")
-   
-def fmt(v):
-    return str(v) if v is not None else f">{cfg['NUM_ROUNDS']}"
+
+    def fmt(v):
+        return str(v) if v is not None else f">{cfg['NUM_ROUNDS']}"
 
     rows = [
         ("First node death (round)",      fmt(ga_fd)),
