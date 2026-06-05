@@ -236,9 +236,8 @@ class Node:
         self.assigned_ch = None
         self.assigned_ms = None
         self.goes_direct = False
-
-    @property
-@property
+       
+       @property
 def energy_fraction(self) -> float:
     return min(self.energy / BATTERY_MAX, 1.0)
 
