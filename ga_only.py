@@ -802,19 +802,21 @@ def _record_stats(nodes: List[Node], stats: dict) -> None:
 # ==============================================================================
 # SECTION 10 - SIMULATION RUNNER
 # ==============================================================================
+def create_nodes(cfg: dict, seed=None) -> List[Node]:
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
 
-def create_nodes(cfg: dict) -> List[Node]:
-    random.seed(42)
-    np.random.seed(42)
-    return [Node(i,
-                 random.uniform(0, cfg["FIELD"]),
-                 random.uniform(0, cfg["FIELD"]),
-                 cfg)
-            for i in range(cfg["NUM_NODES"])]
+    return [Node(
+        i,
+        random.uniform(0, cfg["FIELD"]),
+        random.uniform(0, cfg["FIELD"]),
+        cfg
+    ) for i in range(cfg["NUM_NODES"])]
 
 
 def run_simulation(cfg: dict):
-    nodes = create_nodes(cfg)
+    nodes = create_nodes(cfg, seed=42)
     world = World(nodes=nodes)
     stats = make_stats()
     init_chs = max(1, round(cfg["NUM_NODES"] * cfg["CH_PERCENT"]))
