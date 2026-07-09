@@ -104,7 +104,7 @@ The smart protocol uses a **three-tier hierarchy**:
 ### Installation
 
 ```bash
-git clone https://github.com/Imperial-Dragan/Solar_Aware_Multi_Sink.git
+git clone https://github.com/Flute-Moon/Solar_Aware_Multi_Sink
 cd Solar_Aware_Multi_Sink
 pip install -r requirements.txt
 ```
